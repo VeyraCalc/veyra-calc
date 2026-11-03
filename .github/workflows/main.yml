@@ -20,9 +20,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Install Android SDK packages
         run: |
-          yes | sdkmanager --licenses || true
           sdkmanager --install \
             "platform-tools" \
             "platforms;android-35" \
@@ -30,12 +32,12 @@ jobs:
 
       - name: Extract Android project
         run: |
-          ZIP_FILE=$(find . -maxdepth 3 -type f \
+          ZIP_FILE=$(find . -type f \
             -name 'VeyraCalc-Android-Project*.zip' \
             | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: Android project ZIP file not found!"
+            echo "ERROR: VeyraCalc Android ZIP not found!"
             exit 1
           fi
 
@@ -46,7 +48,7 @@ jobs:
             -name gradlew -print -quit)
 
           if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew file not found!"
+            echo "ERROR: gradlew not found!"
             exit 1
           fi
 
