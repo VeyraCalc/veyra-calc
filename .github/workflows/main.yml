@@ -6,9 +6,13 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -22,23 +26,33 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
-          packages: |
-            platform-tools
-            platforms;android-35
-            build-tools;35.0.0
+
+      - name: Install Android SDK packages
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Extract Android project
         run: |
-          unzip -q "VeyraCalc-Android-Project (2).zip" -d project
-          GRADLEW=$(find project -type f -name gradlew | head -n 1)
-          if [ -z "$GRADLEW" ]; then
-            echo "Gradle wrapper not found"
+          ZIP_FILE=$(find . -maxdepth 1 -type f -name 'VeyraCalc-Android-Project*.zip' -print -quit)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Android project ZIP file not found!"
             exit 1
           fi
+
+          mkdir -p project
+          unzip -q "$ZIP_FILE" -d project
+
+          GRADLEW=$(find project -type f -name gradlew -print -quit)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "Gradle wrapper not found in ZIP file!"
+            exit 1
+          fi
+
           PROJECT_DIR=$(dirname "$GRADLEW")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Build APK
         run: |
@@ -50,4 +64,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: VeyraCalc-APK
-          path: project/**/build/outputs/apk/debug/*.apk
+          path: "**/build/outputs/apk/debug/*.apk"
+          if-no-files-found: error
