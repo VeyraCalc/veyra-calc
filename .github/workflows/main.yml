@@ -6,13 +6,9 @@ on:
     branches:
       - main
 
-permissions:
-  contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -24,30 +20,33 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses || true
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          sdkmanager --install \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Extract Android project
         run: |
-          ZIP_FILE=$(find . -maxdepth 1 -type f -name 'VeyraCalc-Android-Project*.zip' -print -quit)
+          ZIP_FILE=$(find . -maxdepth 3 -type f \
+            -name 'VeyraCalc-Android-Project*.zip' \
+            | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "Android project ZIP file not found!"
+            echo "ERROR: Android project ZIP file not found!"
             exit 1
           fi
 
           mkdir -p project
           unzip -q "$ZIP_FILE" -d project
 
-          GRADLEW=$(find project -type f -name gradlew -print -quit)
+          GRADLEW=$(find project -type f \
+            -name gradlew -print -quit)
 
           if [ -z "$GRADLEW" ]; then
-            echo "Gradle wrapper not found in ZIP file!"
+            echo "ERROR: gradlew file not found!"
             exit 1
           fi
 
@@ -64,5 +63,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: VeyraCalc-APK
-          path: "**/build/outputs/apk/debug/*.apk"
+          path: '**/build/outputs/apk/debug/*.apk'
           if-no-files-found: error
