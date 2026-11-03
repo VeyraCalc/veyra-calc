@@ -1,4 +1,3 @@
-করুন।
 name: Build VeyraCalc APK
 
 on:
@@ -31,7 +30,12 @@ jobs:
       - name: Extract Android project
         run: |
           unzip -q "VeyraCalc-Android-Project (2).zip" -d project
-          PROJECT_DIR=$(dirname "$(find "$GITHUB_WORKSPACE/project" -name gradlew -type f -print -quit)")
+          GRADLEW=$(find project -type f -name gradlew | head -n 1)
+          if [ -z "$GRADLEW" ]; then
+            echo "Gradle wrapper not found"
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$GRADLEW")
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
       - name: Build APK
@@ -44,4 +48,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: VeyraCalc-APK
-          path: "**/build/outputs/apk/debug/*.apk"
+          path: project/**/build/outputs/apk/debug/*.apk
