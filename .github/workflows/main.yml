@@ -11,15 +11,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. Setup Java
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
+      # 3. Locate Android SDK
       - name: Locate Android SDK
         shell: bash
         run: |
@@ -28,6 +31,7 @@ jobs:
           echo "/usr/local/lib/android/sdk/platform-tools" >> $GITHUB_PATH
           echo "/usr/local/lib/android/sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
 
+      # 4. Install Android SDK packages
       - name: Install Android SDK packages
         shell: bash
         run: |
@@ -45,10 +49,11 @@ jobs:
             "platforms;android-35" \
             "build-tools;35.0.0"
 
+      # 5. Extract Android project
       - name: Extract Android project
         shell: bash
         run: |
-          ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
+          ZIP_FILE=$(find . -maxdepth 3 -type f -name "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
             echo "ERROR: Android project ZIP not found"
@@ -66,15 +71,71 @@ jobs:
           fi
 
           PROJECT_DIR=$(dirname "$GRADLEW")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
+          echo "Android project found at: $PROJECT_DIR"
+
+      # 6. Fix missing Color imports
+      - name: Fix Missing Color Imports
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          project = Path("project")
+
+          import_line = "import androidx.compose.ui.graphics.Color"
+          wildcard_import = "import androidx.compose.ui.graphics.*"
+
+          fixed = 0
+
+          for file in project.rglob("*.kt"):
+              content = file.read_text(encoding="utf-8")
+
+              if not re.search(r"\bColor\b", content):
+                  continue
+
+              if import_line in content or wildcard_import in content:
+                  continue
+
+              package_match = re.search(
+                  r"^package\s+[^\n]+",
+                  content,
+                  re.MULTILINE
+              )
+
+              if package_match:
+                  position = package_match.end()
+
+                  content = (
+                      content[:position]
+                      + "\n\n"
+                      + import_line
+                      + content[position:]
+                  )
+              else:
+                  content = import_line + "\n\n" + content
+
+              file.write_text(content, encoding="utf-8")
+
+              print(f"Fixed: {file}")
+              fixed += 1
+
+          print(f"Total files updated: {fixed}")
+          PY
+
+      # 7. Build APK
       - name: Build APK
         shell: bash
         run: |
           cd "$PROJECT_DIR"
+
           chmod +x gradlew
+
           ./gradlew assembleDebug --no-daemon
 
+      # 8. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
