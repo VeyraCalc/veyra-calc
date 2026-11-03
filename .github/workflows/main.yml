@@ -1,0 +1,47 @@
+করুন।
+name: Build VeyraCalc APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Extract Android project
+        run: |
+          unzip -q "VeyraCalc-Android-Project (2).zip" -d project
+          PROJECT_DIR=$(dirname "$(find "$GITHUB_WORKSPACE/project" -name gradlew -type f -print -quit)")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
+      - name: Build APK
+        run: |
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VeyraCalc-APK
+          path: "**/build/outputs/apk/debug/*.apk"
