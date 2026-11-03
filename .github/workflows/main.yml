@@ -20,50 +20,64 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Locate Android SDK
+        shell: bash
+        run: |
+          echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=/usr/local/lib/android/sdk" >> $GITHUB_ENV
+          echo "/usr/local/lib/android/sdk/platform-tools" >> $GITHUB_PATH
+          echo "/usr/local/lib/android/sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
 
       - name: Install Android SDK packages
+        shell: bash
         run: |
-          sdkmanager --install \
+          SDKMANAGER=$(find /usr/local/lib/android/sdk/cmdline-tools -name sdkmanager -type f | head -n 1)
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "ERROR: sdkmanager not found"
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --licenses || true
+
+          "$SDKMANAGER" --install \
             "platform-tools" \
             "platforms;android-35" \
             "build-tools;35.0.0"
 
       - name: Extract Android project
+        shell: bash
         run: |
-          ZIP_FILE=$(find . -type f \
-            -name 'VeyraCalc-Android-Project*.zip' \
-            | head -n 1)
+          ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "ERROR: VeyraCalc Android ZIP not found!"
+            echo "ERROR: Android project ZIP not found"
             exit 1
           fi
 
           mkdir -p project
           unzip -q "$ZIP_FILE" -d project
 
-          GRADLEW=$(find project -type f \
-            -name gradlew -print -quit)
+          GRADLEW=$(find project -type f -name gradlew | head -n 1)
 
           if [ -z "$GRADLEW" ]; then
-            echo "ERROR: gradlew not found!"
+            echo "ERROR: gradlew not found in project"
             exit 1
           fi
 
           PROJECT_DIR=$(dirname "$GRADLEW")
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
       - name: Build APK
+        shell: bash
         run: |
           cd "$PROJECT_DIR"
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: VeyraCalc-APK
-          path: '**/build/outputs/apk/debug/*.apk'
+          path: project/**/build/outputs/apk/debug/*.apk
           if-no-files-found: error
